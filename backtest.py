@@ -47,6 +47,10 @@ def fetch_prices(bzn, start, end):
         time.sleep(10)
     return {h: mean(v) for h, v in by_hour.items()}
 
+today = dt.datetime.now(dt.timezone.utc).date()
+hourly = fetch_prices(BZN, today - dt.timedelta(days=DAYS_HISTORY), today)
+print("Timmar hämtade:", len(hourly))
+
 def weeks(h, ku, agg):
     v = [hourly[h - w * W] for w in (1, 2, 3, 4)
          if (h - w * W) in hourly and (h - w * W) <= ku]

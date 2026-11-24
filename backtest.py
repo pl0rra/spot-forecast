@@ -1,18 +1,33 @@
 import json, datetime as dt, urllib.request, urllib.parse
 from collections import defaultdict
 from statistics import mean, median
+import time
+import urllib.error
 
 BZN = "SE3"
 DAYS_HISTORY = 730
 TEST_DAYS = 180
-CHUNK = 90
+CHUNK = 30
 DAY, W = 86400, 7 * 86400
 
-def get(url, params):
+def get(url, params, tries=5):
     q = urllib.parse.urlencode(params)
     req = urllib.request.Request(f"{url}?{q}", headers={"User-Agent": "spot-forecast/1.0"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return json.load(r)
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            body = e.read()[:300].decode("utf-8", "ignore")
+            print(f"HTTP {e.code} för {params}: {body}")
+            if e.code in (429, 500, 502, 503, 504) and i < tries - 1:
+                time.sleep(30 * (i + 1))
+                continue
+            return None
+        except Exception as e:
+            print(f"Fel för {params}: {e}")
+            time.sleep(10)
+    return None
 
 def fetch_prices(bzn, start, end):
     by_hour = defaultdict(list)
@@ -21,15 +36,16 @@ def fetch_prices(bzn, start, end):
         d1 = min(d0 + dt.timedelta(days=CHUNK - 1), end)
         d = get("https://api.energy-charts.info/price",
                 {"bzn": bzn, "start": d0.isoformat(), "end": d1.isoformat()})
-        for t, p in zip(d["unix_seconds"], d["price"]):
-            if p is not None:
-                by_hour[t // 3600 * 3600].append(p)
+        if d and "unix_seconds" in d:
+            for t, p in zip(d["unix_seconds"], d["price"]):
+                if p is not None:
+                    by_hour[t // 3600 * 3600].append(p)
+            print("Hämtade", d0, d1, flush=True)
+        else:
+            print("Hoppar över", d0, d1, flush=True)
         d0 = d1 + dt.timedelta(days=1)
+        time.sleep(10)
     return {h: mean(v) for h, v in by_hour.items()}
-
-today = dt.datetime.now(dt.timezone.utc).date()
-hourly = fetch_prices(BZN, today - dt.timedelta(days=DAYS_HISTORY), today)
-print("Timmar hämtade:", len(hourly))
 
 def weeks(h, ku, agg):
     v = [hourly[h - w * W] for w in (1, 2, 3, 4)

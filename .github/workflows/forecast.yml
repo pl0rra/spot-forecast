@@ -1,7 +1,5 @@
 name: forecast
 on:
-  schedule:
-    - cron: "30 12 * * *"
   workflow_dispatch:
 permissions:
   contents: write

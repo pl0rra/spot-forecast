@@ -99,6 +99,23 @@ test["e_base"] = (test["base"] - test["y"]).abs()
 test["e_model"] = (test["pred"] - test["y"]).abs()
 test["mån"] = pd.to_datetime(test["ts"], unit="s", utc=True).dt.strftime("%Y-%m")
 print(test.groupby("mån")[["e_base", "e_model"]].mean().round(1))
+ts_all = test["ts"].to_numpy()
+err_all = (test["pred"] - test["y"]).to_numpy()
+o = np.argsort(ts_all)
+ts_s, cs = ts_all[o], np.concatenate([[0.0], np.cumsum(err_all[o])])
+
+def bias_at(T):
+    kp = T + 2 * D - H
+    lo = np.searchsorted(ts_s, kp - 14 * D, side="right")
+    hi = np.searchsorted(ts_s, kp, side="right")
+    return (cs[hi] - cs[lo]) / (hi - lo) if hi - lo >= 500 else 0.0
+
+test["bias_hat"] = test["T"].map({T: bias_at(T) for T in test["T"].unique()})
+for lam in (0.5, 1.0):
+    test[f"e_k{lam}"] = (test["pred"] - lam * test["bias_hat"] - test["y"]).abs()
+print(test.groupby("mån")[["e_model", "e_k0.5", "e_k1.0"]].mean().round(1))
+print("TOTALT justerat:", round(test.e_model.mean(), 1),
+      round(test["e_k0.5"].mean(), 1), round(test["e_k1.0"].mean(), 1))
 test["bias"] = test["pred"] - test["y"]
 print(test.groupby("mån")["bias"].mean().round(1))
 print("ledtid  baslinje  modell")

@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from statistics import mean
 
-TOKEN = os.environ["ae20322e-347f-477c-b23f-5b7a7750a3c2"] #ENTSO-token
+TOKEN = os.environ["ENTSOE_TOKEN"] #ENTSO-token
 UTC = dt.timezone.utc
 BASE = "https://web-api.tp.entsoe.eu/api"
 SE3 = "10Y1001A1001A46L"

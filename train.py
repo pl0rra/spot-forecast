@@ -56,7 +56,7 @@ def build(L):
 df = pd.concat([build(L) for L in LEADS], ignore_index=True)
 df["res"] = df["y"] - df["base"]
 df = df.dropna(subset=["y", "base"]).reset_index(drop=True)
-feats = [c for c in df.columns if c not in ("ts", "T", "y", "base", "res")]
+feats = [c for c in df.columns if c not in ("ts", "T", "y", "base", "res", "month")]
 
 today0 = int(pd.Timestamp.now(tz="UTC").normalize().timestamp())
 first_T, last_T = today0 - (TEST_DAYS + 8) * D, today0 - 8 * D

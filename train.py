@@ -30,6 +30,7 @@ def take(arr, pos):
 
 lags = np.column_stack([take(se3, i - 168 * k) for k in (1, 2, 3, 4)])
 base = np.nanmean(lags, axis=1)
+rb24, rb168 = roll(base, 24), roll(base, 168)
 loc = pd.to_datetime(idx, unit="s", utc=True).tz_convert("Europe/Stockholm")
 
 def build(L):
@@ -45,6 +46,10 @@ def build(L):
         "mean24": take(r24, kpos), "mean168": take(r168, kpos),
         "de_mean24": take(d24, kpos), "de_mean168": take(d168, kpos),
         "de_w1": take(de, i - 168),
+        "dev24": take(r24, kpos) - take(rb24, kpos),
+        "dev168": take(r168, kpos) - take(rb168, kpos),
+        "spread24": take(d24, kpos) - take(r24, kpos),
+        "spread168": take(d168, kpos) - take(r168, kpos),
         "hour": loc.hour.to_numpy(), "dow": loc.dayofweek.to_numpy(), "month": loc.month.to_numpy(),
     })
     for name in WX:

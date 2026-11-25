@@ -1,7 +1,5 @@
 name: data
 on:
-  schedule:
-    - cron: "30 4 * * *"
   workflow_dispatch:
 permissions:
   contents: write

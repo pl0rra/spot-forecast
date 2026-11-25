@@ -3,7 +3,7 @@ import numpy as np, pandas as pd
 import lightgbm as lgb
 warnings.filterwarnings("ignore")
 
-TEST_DAYS, BLOCK_DAYS = 180, 30
+TEST_DAYS, BLOCK_DAYS = 365, 30
 LEADS = list(range(2, 8))
 H, D = 3600, 86400
 WX = ["wind_se3", "wind_se_north", "wind_dk", "wind_de", "temp_sthlm"]
@@ -78,6 +78,8 @@ for b in sorted(test["blk"].unique()):
 
 test["e_base"] = (test["base"] - test["y"]).abs()
 test["e_model"] = (test["pred"] - test["y"]).abs()
+test["mån"] = pd.to_datetime(test["ts"], unit="s", utc=True).dt.strftime("%Y-%m")
+print(test.groupby("mån")[["e_base", "e_model"]].mean().round(1))
 print("ledtid  baslinje  modell")
 res = {"per_lead": {}}
 for L in LEADS:

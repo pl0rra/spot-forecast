@@ -99,6 +99,8 @@ test["e_base"] = (test["base"] - test["y"]).abs()
 test["e_model"] = (test["pred"] - test["y"]).abs()
 test["mån"] = pd.to_datetime(test["ts"], unit="s", utc=True).dt.strftime("%Y-%m")
 print(test.groupby("mån")[["e_base", "e_model"]].mean().round(1))
+test["bias"] = test["pred"] - test["y"]
+print(test.groupby("mån")["bias"].mean().round(1))
 print("ledtid  baslinje  modell")
 res = {"per_lead": {}}
 for L in LEADS:

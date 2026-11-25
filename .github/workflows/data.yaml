@@ -15,6 +15,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: python update_data.py
+      - run: python update_entsoe.py
+        env:
+          ENTSOE_TOKEN: ${{ secrets.ae20322e-347f-477c-b23f-5b7a7750a3c2 }}
       - name: Spara data
         if: always()
         run: |

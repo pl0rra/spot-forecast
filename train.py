@@ -20,6 +20,16 @@ i = np.arange(n)
 def roll(a, w):
     return pd.Series(a).rolling(w, min_periods=w // 2).mean().to_numpy()
 r24, r168, d24, d168 = roll(se3, 24), roll(se3, 168), roll(de, 24), roll(de, 168)
+nu = pd.read_csv("data/nuclear.csv").set_index("ts").reindex(idx)["nuclear_mw"].to_numpy(float)
+nu24, nu168 = roll(nu, 24), roll(nu, 168)
+
+hw = pd.read_csv("data/hydro.csv")
+hw["total"] = hw[["no1", "no2", "no3", "no4", "no5"]].sum(axis=1, min_count=5)
+hw["week"] = pd.to_datetime(hw["ts"], unit="s", utc=True).dt.isocalendar().week.astype(int)
+hw["anom"] = (hw["total"] / hw.groupby("week")["total"].transform("median") - 1) * 100
+s = hw.set_index(hw["ts"] + 10 * D)["anom"].dropna()
+s = s[~s.index.duplicated()]
+hy = s.reindex(s.index.union(idx)).sort_index().ffill().reindex(idx).to_numpy(float)
 
 def take(arr, pos):
     pos = np.asarray(pos)
@@ -37,6 +47,7 @@ def build(L):
     day0 = idx - idx % D
     T = day0 - L * D
     kpos = (T + 2 * D - H - t0) // H          # sista kända timmen
+    gpos = (T + 11 * H - t0) // H
     m0 = np.maximum(1, (i - kpos + 23) // 24)
     prof = np.column_stack([take(se3, i - (m0 + j) * 24) for j in range(7)])
     f = pd.DataFrame({
@@ -46,6 +57,9 @@ def build(L):
         "mean24": take(r24, kpos), "mean168": take(r168, kpos),
         "de_mean24": take(d24, kpos), "de_mean168": take(d168, kpos),
         "de_w1": take(de, i - 168),
+        "nuc24": take(nu24, gpos), "nuc168": take(nu168, gpos),
+        "nuc_chg": take(nu24, gpos) - take(nu168, gpos),
+        "hydro_anom": take(hy, gpos),
         "dev24": take(r24, kpos) - take(rb24, kpos),
         "dev168": take(r168, kpos) - take(rb168, kpos),
         "spread24": take(d24, kpos) - take(r24, kpos),

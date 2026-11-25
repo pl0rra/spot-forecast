@@ -1,4 +1,4 @@
 pandas
 numpy
 lightgbm
-scikit
+scikit-learn

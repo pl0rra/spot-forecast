@@ -88,8 +88,7 @@ mb, mm = test.e_base.mean(), test.e_model.mean()
 res.update(base=round(mb, 1), model=round(mm, 1))
 print(f"TOTALT {mb:.1f} -> {mm:.1f} EUR/MWh ({(1 - mm / mb) * 100:.0f}% bättre)")
 
-imp = sorted(zip(feats, model.booster_.feature_importances_ if False else model.booster_.feature_importance("gain")),
-             key=lambda x: -x[1])[:15]
+imp = sorted(zip(feats, model.booster_.feature_importance("gain")), key=lambda x: -x[1])[:15]
 print("Viktigaste indata (sista modellen):")
 for k, v in imp:
     print(f"  {k:18s} {v:12.0f}")

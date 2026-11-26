@@ -205,11 +205,94 @@ for h in range(start, start + 168 * H, H):
     prices.append(round(float(val), 2)); kn.append(bool(k))
     los.append(round(float(a), 2)); his.append(round(float(b), 2))
 
+from zoneinfo import ZoneInfo
+SE = ZoneInfo("Europe/Stockholm")
+WINDOW, MOMS = 3, 1.0          # MOMS = 1.25 ger pris inklusive moms
+
+def eur_sek():
+    for params in ({"base": "EUR", "symbols": "SEK"}, {"from": "EUR", "to": "SEK"}):
+        d = get("https://api.frankfurter.dev/v1/latest", params, tries=2)
+        try:
+            return float(d["rates"]["SEK"])
+        except Exception:
+            pass
+    print("Varning: ingen växelkurs hittades, använder 11.0", flush=True)
+    return 11.0
+
+RATE = eur_sek()
+
+def ore(eur_mwh):
+    return eur_mwh * RATE / 10 * MOMS
+
+def label(nk, n):
+    return "Nord Pool" if nk == n else ("prognos" if nk == 0 else "delvis prognos")
+
+def day_windows(times, vals, kn):
+    days = defaultdict(list)
+    for t, v, k in zip(times, vals, kn):
+        u = dt.datetime.fromisoformat(t)
+        days[u.astimezone(SE).date()].append((u, v, k))
+    res = []
+    for day, rows in sorted(days.items()):
+        rows.sort(key=lambda r: r[0])
+        if len(rows) < 12:
+            continue
+        res.append({"day": day.isoformat(), "kind": "snitt",
+                    "avg_ore": round(ore(mean(r[1] for r in rows)), 1),
+                    "status": label(sum(1 for r in rows if r[2]), len(rows))})
+        cands = []
+        for j in range(len(rows) - WINDOW + 1):
+            w = rows[j:j + WINDOW]
+            if w[-1][0] - w[0][0] == dt.timedelta(hours=WINDOW - 1):
+                cands.append((mean(r[1] for r in w), w))
+        if not cands:
+            continue
+        for kind, (m, w) in (("billigast", min(cands, key=lambda c: c[0])),
+                             ("dyrast", max(cands, key=lambda c: c[0]))):
+            res.append({"day": day.isoformat(), "kind": kind,
+                        "start": w[0][0].isoformat(),
+                        "end": (w[-1][0] + dt.timedelta(hours=1)).isoformat(),
+                        "avg_ore": round(ore(m), 1),
+                        "status": label(sum(1 for r in w if r[2]), WINDOW)})
+    return res
+
+wins = day_windows(times, prices, kn)
+
 out = {"generated": now.isoformat(timespec="seconds"), "zone": "SE3", "unit": "EUR/MWh",
        "method": f"lgbm_residual_bias{LAMBDA}", "bias_hat": round(bias_hat, 1),
+       "rate": round(RATE, 4), "windows": wins,
        "time": times, "price": prices, "known": kn, "lo": los, "hi": his}
 os.makedirs("history", exist_ok=True)
 for path in ("forecast.json", f"history/{today.isoformat()}.json"):
     with open(path, "w") as f:
         json.dump(out, f)
-print("OK", len(times), "timmar,", kn.count(True), "kända, bias_hat", round(bias_hat, 1))
+
+# ---------- kalenderfil ----------
+def esc(s):
+    return s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+
+def z(u):
+    return u.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+stamp = z(now)
+cal = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//spot-forecast//SE3//SV", "CALSCALE:GREGORIAN"]
+for w in wins:
+    pre = "" if w["status"] == "Nord Pool" else "≈ "
+    cal += ["BEGIN:VEVENT", f"UID:{w['kind']}-{w['day']}@spot-forecast", f"DTSTAMP:{stamp}"]
+    if w["kind"] == "snitt":
+        d0 = dt.date.fromisoformat(w["day"])
+        summary = f"Snitt {pre}{w['avg_ore']:.0f} öre/kWh ({w['status']})"
+        cal += [f"DTSTART;VALUE=DATE:{d0:%Y%m%d}",
+                f"DTEND;VALUE=DATE:{d0 + dt.timedelta(days=1):%Y%m%d}"]
+    else:
+        s0 = dt.datetime.fromisoformat(w["start"])
+        e0 = dt.datetime.fromisoformat(w["end"])
+        summary = (f"{w['kind'].capitalize()} {s0.astimezone(SE):%H}–{e0.astimezone(SE):%H} "
+                   f"{pre}{w['avg_ore']:.0f} öre ({w['status']})")
+        cal += [f"DTSTART:{z(s0)}", f"DTEND:{z(e0)}"]
+    cal += [f"SUMMARY:{esc(summary)}", "END:VEVENT"]
+cal.append("END:VCALENDAR")
+with open("prisprognos.ics", "w", encoding="utf-8", newline="") as f:
+    f.write("\r\n".join(cal) + "\r\n")
+print("OK", len(times), "timmar,", kn.count(True), "kända, bias_hat", round(bias_hat, 1),
+      "kurs", round(RATE, 3), "händelser", len(wins))

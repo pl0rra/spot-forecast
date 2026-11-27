@@ -188,9 +188,11 @@ liv["hi"] = liv["pred"] + liv["lead"].map(lambda L: q[L][1])
 lp = liv.set_index("ts")
 
 # ---------- skriv ----------
-start = int(now.timestamp()) // H * H
+from zoneinfo import ZoneInfo
+SE = ZoneInfo("Europe/Stockholm")
+start = int(now.astimezone(SE).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
 times, prices, kn, los, his = [], [], [], [], []
-for h in range(start, start + 168 * H, H):
+for h in range(start, start + 192 * H, H):
     pos = (h - t0) // H
     y = se3[pos]
     if not np.isnan(y):
